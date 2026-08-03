@@ -169,9 +169,15 @@ def _extract_net_name_info(
     hierarchy = electrical.get_hierarchy()
     elec_depth = len(hierarchy)
 
-    # Process all found trait instances, prioritizing EXPECTED
+    # ElectricPower pre-attaches SUGGESTED "hv"/"lv", and
+    # override_net_name adds an EXPECTED one on top. Taking
+    # only the first would drop the override.
+    # Two SUGGESTED on one node tie on rank, so
+    # _determine_base_name breaks it lexicographically.
     def check_suggested_name(node: fabll.Node, depth: int):
-        if has_net_name_suggestion := node.try_get_trait(F.has_net_name_suggestion):
+        for has_net_name_suggestion in node.get_trait_instances(
+            F.has_net_name_suggestion
+        ):
             owner_node = fabll.Traits(has_net_name_suggestion).get_obj_raw()
             if (
                 has_net_name_suggestion.level

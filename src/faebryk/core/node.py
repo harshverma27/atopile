@@ -1616,6 +1616,36 @@ class Node[T: NodeAttributes = NodeAttributes](metaclass=NodeMeta):
             return None
         return trait(impl)
 
+    def get_trait_instances[TR: NodeT](self, trait: type[TR]) -> list[TR]:
+        """
+        Every instance of `trait` on this node, in insertion order.
+        `try_get_trait` returns only the first.
+        """
+        # ponytail: a Python callback and an extra boundary crossing per hit.
+        # Fine once per build; move the loop into Zig if it lands somewhere hot.
+        trait_type = TypeNodeBoundTG.get_or_create_type_in_tg(self.tg, trait)
+
+        edges: list[graph.BoundEdge] = []
+
+        def collect(ctx: list[graph.BoundEdge], edge: graph.BoundEdge) -> None:
+            ctx.append(edge)
+
+        fbrk.EdgeTrait.visit_trait_instances_of_type(
+            owner=self.instance,
+            trait_type=trait_type.node(),
+            ctx=edges,
+            f=collect,
+        )
+
+        return [
+            trait(
+                edge.g().bind(
+                    node=fbrk.EdgeTrait.get_trait_instance_node(edge=edge.edge())
+                )
+            )
+            for edge in edges
+        ]
+
     def get_trait[TR: Node](self, trait: type[TR]) -> TR:
         return cast(TR, self.try_get_trait(trait, required=True))
 
